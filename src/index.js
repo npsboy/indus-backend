@@ -23,6 +23,13 @@ async function handleChatRequest(request, env) {
 
 	const { agentRole, messages, image_base64 } = messagedata;
 
+	if (!agentRole || !messages) {
+		return new Response('agentRole and messages are required.', { status: 400 });
+	}
+	if (!Array.isArray(messages)) {
+		return new Response('messages must be an array.', { status: 400 });
+	}
+
 	let model;
 
 	if (agentRole === 'planner') {
