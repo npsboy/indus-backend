@@ -19,9 +19,19 @@ export default {
 };
 
 async function handleChatRequest(request, env) {
+
+	{/* format of expected request body:
+	{
+		"agentRole": "planner" | "interpreter" | "reader",
+		"messages": [ { "role": "user" | system", "content": "..." }, ... ],
+		"imageUrl": "..."  // optional
+	}
+	*/}
+
+
 	let messagedata = await request.json();
 
-	const { agentRole, messages, image_base64 } = messagedata;
+	const { agentRole, messages, imageUrl } = messagedata;
 
 	if (!agentRole || !messages) {
 		return new Response('agentRole and messages are required.', { status: 400 });
@@ -44,7 +54,7 @@ async function handleChatRequest(request, env) {
 
 
 	let response;
-	if (image_base64) {
+	if (imageUrl) {
 		// If an image is provided, use the Responses API which supports image inputs.
 		// Convert chat messages into the Responses API input format, then append the image.
 		const input = (messages || []).map(m => ({
@@ -54,7 +64,7 @@ async function handleChatRequest(request, env) {
 
 		input.push({
 			role: "user",
-			content: [{ type: "input_image", image_base64 }]
+			content: [{ type: "input_image", image_url: imageUrl }]
 		});
 
 		response = await fetch('https://api.openai.com/v1/responses', {
@@ -117,10 +127,22 @@ async function handleChatRequest(request, env) {
 }
 
 async function handleComputerRequest(request, env) {
+
+	{/* format of expected request body:
+	{
+		"goal": "string",                     // required
+		"imageUrl": "string",        // optional
+		"displayWidth": 1024,                // optional, default 1024
+		"displayHeight": 768,                // optional, default 768
+		"environment": "browser"             // optional, default "browser"
+	}
+	*/}
+
+
 	const body = await request.json();
 	const {
   	  	goal,
-  	  	screenshotBase64,   // Optional
+  	  	imageUrl,   // Optional
   	  	displayWidth = 1024, //default value
   	  	displayHeight = 768, //default value	
   	  	environment = "browser"
@@ -131,9 +153,9 @@ async function handleComputerRequest(request, env) {
 	}
 
 	let inputContent = [{type:"input_text", text:goal}];
-	if (screenshotBase64) {
+	if (imageUrl) {
 		// use Responses content type for images
-		inputContent.push({type:"input_image", image_base64:screenshotBase64});
+		inputContent.push({type:"input_image", image_url:imageUrl});
 	}
 	// use the Responses API for tool-enabled requests like Computer Use
 	const response = await fetch('https://api.openai.com/v1/responses', {
