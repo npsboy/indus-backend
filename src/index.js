@@ -12,6 +12,8 @@ export default {
 		if (path === '/computer' && request.method === 'POST') {
 			return handleComputerRequest(request, env);
 		}
+		if (path === '/agent' && request.method === 'GET') {
+		}
 		return new Response('Not Found', { status: 404 });
 
 	},
@@ -23,15 +25,12 @@ async function handleChatRequest(request, env) {
 	{/* format of expected request body:
 	{
 		"agentRole": "planner" | "interpreter" | "reader",
-		"messages": [ { "role": "user" | system", "content": "..." }, ... ],
+		"messages": [ { "role": "user" | "system", "content": "..." }, ... ],
 		"imageUrl": "..."  // optional
 	}
 	*/}
 
-
-	let messagedata = await request.json();
-
-	const { agentRole, messages, imageUrl } = messagedata;
+	const { agentRole, messages, imageUrl } = await request.json();
 
 	if (!agentRole || !messages) {
 		return new Response('agentRole and messages are required.', { status: 400 });
@@ -41,7 +40,6 @@ async function handleChatRequest(request, env) {
 	}
 
 	let model;
-
 	if (agentRole === 'planner') {
 		model = 'gpt-5.2';
 	} else if (agentRole === 'interpreter') {
@@ -52,65 +50,26 @@ async function handleChatRequest(request, env) {
 		return new Response('Invalid role specified.', { status: 400 });
 	}
 
+	const input = messages.map(m => ({
+		role: m.role,
+		content: [{ type: "input_text", text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
+	}));
 
-	let response;
 	if (imageUrl) {
-		// If an image is provided, use the Responses API which supports image inputs.
-		// Convert chat messages into the Responses API input format, then append the image.
-		const input = (messages || []).map(m => ({
-			role: m.role,
-			content: [{ type: "input_text", text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
-		}));
-
 		input.push({
 			role: "user",
 			content: [{ type: "input_image", image_url: imageUrl }]
 		});
-
-		response = await fetch('https://api.openai.com/v1/responses', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-			},
-			body: JSON.stringify({
-				model,
-				input
-			}),
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			return new Response(`OpenAI API error: ${errorText}`, { status: response.status });
-		}
-
-		const data = await response.json();
-		// Try common places where text output may be found in the Responses API reply.
-		const reply =
-			data.output_text ||
-			(Array.isArray(data.output) && data.output.map(o => {
-				if (typeof o === 'string') return o;
-				if (o?.content) return o.content.map(c => c.text || '').join('');
-				return '';
-			}).join('\n')) ||
-			JSON.stringify(data);
-
-		const dataToReturn = { reply };
-		return new Response(JSON.stringify(dataToReturn), { status: 200, headers: { 'Content-Type': 'application/json' } });
-	} else {
-		// No image: use the Chat Completions endpoint as before.
-		response = await fetch('https://api.openai.com/v1/chat/completions', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-			},
-			body: JSON.stringify({
-				model: model,
-				messages: messages
-			}),
-		});
 	}
+
+	const response = await fetch('https://api.openai.com/v1/responses', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+		},
+		body: JSON.stringify({ model, input }),
+	});
 
 	if (!response.ok) {
 		const errorText = await response.text();
@@ -118,12 +77,16 @@ async function handleChatRequest(request, env) {
 	}
 
 	const data = await response.json();
-	const reply = data.choices[0].message.content;
+	const reply =
+		data.output_text ||
+		(Array.isArray(data.output) && data.output.map(o => {
+			if (typeof o === 'string') return o;
+			if (o?.content) return o.content.map(c => c.text || '').join('');
+			return '';
+		}).join('\n')) ||
+		JSON.stringify(data);
 
-	const dataToReturn = {
-		reply: reply,
-	};
-	return new Response(JSON.stringify(dataToReturn), { status: 200, headers: { 'Content-Type': 'application/json' } });
+	return new Response(JSON.stringify({ reply }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
 async function handleComputerRequest(request, env) {
@@ -197,4 +160,127 @@ async function handleComputerRequest(request, env) {
 	const output = data.output ?? data;
 	return new Response(JSON.stringify(output), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
+}
+
+async function handleAgentRequest(request, env) {
+
+	{/* format of expected request body:
+	{
+		"messages": [ { "role": "user" | "system", "content": "..." }, ... ],
+		"imageUrl": "..."  // optional
+	}
+	*/}
+
+	const { messages, imageUrl } = await request.json();
+
+	if (!messages) {
+		return new Response('messages are required.', { status: 400 });
+	}
+	if (!Array.isArray(messages)) {
+		return new Response('messages must be an array.', { status: 400 });
+	}
+
+	const model = "gpt-5-mini";
+
+	const input = messages.map(m => ({
+		role: m.role,
+		content: [{ type: "input_text", text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
+	}));
+
+	if (imageUrl) {
+		input.push({
+			role: "user",
+			content: [{ type: "input_image", image_url: imageUrl }]
+		});
+	}
+
+	const tools = [
+		{
+			type: "function",
+			function: {
+				name: "click",
+				description: "Click on a specific element in the UI.",
+				parameters: {
+					type: "object",
+					properties: {
+						x: { type: "string", description: "The column no of the element to click." },
+						y: { type: "string", description: "The row no of the element to click." }
+					},
+					required: ["x", "y"]
+				}
+			}
+		},
+		{
+			type: "function",
+			function: {
+				name: "type",
+				description: "Input text into a specific field in the UI.",
+				parameters: {
+					type: "object",
+					properties: {
+						x: { type: "string", description: "The column no of the field." },
+						y: { type: "string", description: "The row no of the field." },
+						text: { type: "string", description: "The text to input." }
+					},
+					required: ["x", "y", "text"]
+				}
+			}
+		},
+		{
+			type: "function",
+			function: {
+				name: "navigate",
+				description: "Navigate to a specific URL.",
+				parameters: {
+					type: "object",
+					properties: {
+						url: { type: "string", description: "The URL to navigate to." }
+					},
+					required: ["url"]
+				}
+			}
+		}
+	];
+
+	const response = await fetch('https://api.openai.com/v1/responses', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
+		},
+		body: JSON.stringify({ model, input, tools }),
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		return new Response(`OpenAI API error: ${errorText}`, { status: response.status });
+	}
+
+	const data = await response.json();
+
+	let replyText = "";
+	let toolCall = null;
+	if (Array.isArray(data.output)) {
+		for (const item of data.output) {
+			if (item.type === "message") {
+				for (const content of item.content || []) {
+					if (content.type === "output_text") {
+						replyText += content.text;
+					}
+				}
+			}
+
+			if (item.type === "tool_call") {
+				toolCall = {
+					name: item.name,
+					arguments: item.arguments
+				};
+			}
+		}
+	}
+
+	return new Response(JSON.stringify({
+		reply: replyText,
+		tool: toolCall
+	}));
 }
