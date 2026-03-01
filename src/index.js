@@ -12,7 +12,7 @@ export default {
 		if (path === '/computer' && request.method === 'POST') {
 			return handleComputerRequest(request, env);
 		}
-		if (path === '/agent' && request.method === 'GET') {
+		if (path === '/agent' && request.method === 'POST') {
 			return handleAgentRequest(request, env);
 		}
 		return new Response('Not Found', { status: 404 });
