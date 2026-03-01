@@ -198,47 +198,41 @@ async function handleAgentRequest(request, env) {
 	const tools = [
 		{
 			type: "function",
-			function: {
-				name: "click",
-				description: "Click on a specific element in the UI.",
-				parameters: {
-					type: "object",
-					properties: {
-						x: { type: "string", description: "The column no of the element to click." },
-						y: { type: "string", description: "The row no of the element to click." }
-					},
-					required: ["x", "y"]
-				}
+			name: "click",
+			description: "Click on a specific element in the UI.",
+			parameters: {
+				type: "object",
+				properties: {
+					x: { type: "string", description: "The column no of the element to click." },
+					y: { type: "string", description: "The row no of the element to click." }
+				},
+				required: ["x", "y"]
 			}
 		},
 		{
 			type: "function",
-			function: {
-				name: "type",
-				description: "Input text into a specific field in the UI.",
-				parameters: {
-					type: "object",
-					properties: {
-						x: { type: "string", description: "The column no of the field." },
-						y: { type: "string", description: "The row no of the field." },
-						text: { type: "string", description: "The text to input." }
-					},
-					required: ["x", "y", "text"]
-				}
+			name: "type",
+			description: "Input text into a specific field in the UI.",
+			parameters: {
+				type: "object",
+				properties: {
+					x: { type: "string", description: "The column no of the field." },
+					y: { type: "string", description: "The row no of the field." },
+					text: { type: "string", description: "The text to input." }
+				},
+				required: ["x", "y", "text"]
 			}
 		},
 		{
 			type: "function",
-			function: {
-				name: "navigate",
-				description: "Navigate to a specific URL.",
-				parameters: {
-					type: "object",
-					properties: {
-						url: { type: "string", description: "The URL to navigate to." }
-					},
-					required: ["url"]
-				}
+			name: "navigate",
+			description: "Navigate to a specific URL.",
+			parameters: {
+				type: "object",
+				properties: {
+					url: { type: "string", description: "The URL to navigate to." }
+				},
+				required: ["url"]
 			}
 		}
 	];
