@@ -208,7 +208,8 @@ async function handleAgentRequest(request, env) {
 				type: "object",
 				properties: {
 					x: { type: "string", description: "The column no of the element to click." },
-					y: { type: "string", description: "The row no of the element to click." }
+					y: { type: "string", description: "The row no of the element to click." },
+					explanation: { type: "string", description: "one tiny sentence describing what you just clicked." },
 				},
 				required: ["x", "y"]
 			}
@@ -222,7 +223,8 @@ async function handleAgentRequest(request, env) {
 				properties: {
 					x: { type: "string", description: "The column label of the field." },
 					y: { type: "string", description: "The row label of the field." },
-					text: { type: "string", description: "The text to input." }
+					text: { type: "string", description: "The text to input." },
+					explanation: { type: "string", description: "one tiny sentence describing what you just typed." },
 				},
 				required: ["x", "y", "text"]
 			}
@@ -234,9 +236,22 @@ async function handleAgentRequest(request, env) {
 			parameters: {
 				type: "object",
 				properties: {
-					url: { type: "string", description: "The URL to navigate to." }
+					url: { type: "string", description: "The URL to navigate to." },
+					explanation: { type: "string", description: "one tiny sentence describing why you are navigating there." },
 				},
 				required: ["url"]
+			}
+		},
+		{
+			type: "function",
+			name: "warn",
+			description:"detect if a sensitive operation has been encountered like login, payments, posting in public and so on and warn the user",
+			parameters: {
+				type: "object",
+				properties: {
+					message: { type: "string", description: "The warning message to show the user." },
+				},
+				required: ["message"]
 			}
 		}
 	];
