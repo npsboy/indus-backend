@@ -78,16 +78,20 @@ async function handleChatRequest(request, env) {
 	}
 
 	const data = await response.json();
-	const reply =
-		data.output_text ||
-		(Array.isArray(data.output) && data.output.map(o => {
-			if (typeof o === 'string') return o;
-			if (o?.content) return o.content.map(c => c.text || '').join('');
-			return '';
-		}).join('\n')) ||
-		JSON.stringify(data);
 
-	return new Response(JSON.stringify({ reply }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+	let reply = '';
+	if (Array.isArray(data.output)) {
+		for (const item of data.output) {
+			if (item.type === 'message') {
+				for (const c of item.content || []) {
+					if (c.type === 'output_text') reply += c.text || '';
+				}
+			}
+		}
+	}
+	if (!reply) reply = data.output_text || (typeof data.content === 'string' ? data.content : '');
+
+	return new Response(JSON.stringify({ reply, _raw: data }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
 
 async function handleComputerRequest(request, env) {
@@ -216,8 +220,8 @@ async function handleAgentRequest(request, env) {
 			parameters: {
 				type: "object",
 				properties: {
-					x: { type: "string", description: "The column no of the field." },
-					y: { type: "string", description: "The row no of the field." },
+					x: { type: "string", description: "The column label of the field." },
+					y: { type: "string", description: "The row label of the field." },
 					text: { type: "string", description: "The text to input." }
 				},
 				required: ["x", "y", "text"]
@@ -253,29 +257,28 @@ async function handleAgentRequest(request, env) {
 
 	const data = await response.json();
 
-	let replyText = "";
+	let replyText = '';
 	let toolCall = null;
+
 	if (Array.isArray(data.output)) {
 		for (const item of data.output) {
-			if (item.type === "message") {
-				for (const content of item.content || []) {
-					if (content.type === "output_text") {
-						replyText += content.text;
-					}
+			if (item.type === 'message') {
+				for (const c of item.content || []) {
+					if (c.type === 'output_text') replyText += c.text || '';
 				}
 			}
-
-			if (item.type === "tool_call") {
-				toolCall = {
-					name: item.name,
-					arguments: item.arguments
-				};
+			if (item.type === 'function_call') {
+				toolCall = { name: item.name, arguments: item.arguments };
 			}
 		}
 	}
 
+	// fallbacks for alternate shapes
+	if (!replyText) replyText = data.output_text || (typeof data.content === 'string' ? data.content : '');
+	if (!toolCall && data.function_call) toolCall = { name: data.function_call.name, arguments: data.function_call.arguments };
+
 	return new Response(JSON.stringify({
 		reply: replyText,
-		tool: toolCall
-	}));
+		tool: toolCall,
+	}), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
