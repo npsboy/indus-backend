@@ -257,7 +257,7 @@ async function handleAgentRequest(request, env) {
 		{ 
 			type: "function",
 			name: "final_answer",
-			description: "Conclude the agent execution with a final answer to the user's original query/ task. Only use this when you are 100% sure that you have completed the entire task.",
+			description: "Conclude the agent execution with a final answer to the user's original query/ task. Use this when you feel you have completed the entire task to a reasonable level.",
 			parameters: {
 				type: "object",
 				properties: {
