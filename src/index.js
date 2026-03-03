@@ -244,6 +244,34 @@ async function handleAgentRequest(request, env) {
 		},
 		{
 			type: "function",
+			name: "scroll",
+			description: "Scroll to a specific part of the page.",
+			parameters: {
+				type: "object",
+				properties: {
+					x: { type: "string", description: "The column no to anchor the scrolling to." },
+					y: { type: "string", description: "The row no to anchor the scrolling to." },
+					delta_x: { type: "string", description: "The no of columns to scroll by. Can be positive or negative. Horizontal scrolling is not used much." },
+					delta_y: { type: "string", description: "The no of rows to scroll by. Can be positive or negative." },
+					explanation: { type: "string", description: "one tiny sentence describing why you are scrolling there." },
+				},
+				required: ["x", "y", "delta_y"]
+			}
+		},
+		{
+			type: "function",
+			name: "wait",
+			description: "Wait for a specific ammount of time. Use this if an action is still in progress and you want to avoid interupting it.",
+			parameters: {
+				type: "object",
+				properties: {
+					seconds: { type: "string", description: "The number of seconds to wait." },
+				},
+				required: ["seconds"]
+			}
+		},
+		{
+			type: "function",
 			name: "warn",
 			description:"detect if the very next step is a sensitive action like login, payments, posting in public and so on and warn the user. Only warn at the last moment possible and only if you absolutely cannot proceed even a step further.",
 			parameters: {
