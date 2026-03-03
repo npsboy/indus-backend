@@ -185,7 +185,7 @@ async function handleAgentRequest(request, env) {
 		return new Response('messages must be an array.', { status: 400 });
 	}
 
-	const model = "gpt-5-mini";
+	const model = "gpt-5.2";
 
 	const input = messages.map(m => ({
 		role: m.role,
@@ -245,13 +245,25 @@ async function handleAgentRequest(request, env) {
 		{
 			type: "function",
 			name: "warn",
-			description:"detect if a sensitive operation has been encountered like login, payments, posting in public and so on and warn the user",
+			description:"detect if the very next step is a sensitive action like login, payments, posting in public and so on and warn the user. Only warn at the last moment possible and only if you absolutely cannot proceed even a step further.",
 			parameters: {
 				type: "object",
 				properties: {
 					message: { type: "string", description: "The warning message to show the user." },
 				},
 				required: ["message"]
+			}
+		},
+		{ 
+			type: "function",
+			name: "final_answer",
+			description: "Conclude the agent execution with a final answer to the user's original query/ task. Only use this when you are 100% sure that you have completed the entire task.",
+			parameters: {
+				type: "object",
+				properties: {
+					answer: { type: "string", description: "The final answer to the user's original question." },
+				},
+				required: ["answer"]
 			}
 		}
 	];
@@ -262,7 +274,7 @@ async function handleAgentRequest(request, env) {
 			'Content-Type': 'application/json',
 			'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
 		},
-		body: JSON.stringify({ model, input, tools }),
+		body: JSON.stringify({ model, input, tools, text: { format: { type: "json_object" } } }),
 	});
 
 	if (!response.ok) {
