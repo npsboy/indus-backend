@@ -231,6 +231,19 @@ async function handleAgentRequest(request, env) {
 		},
 		{
 			type: "function",
+			name: "key_press",
+			description: "Simulate a key press.",
+			parameters: {
+				type: "object",
+				properties: {
+					key: { type: "string", description: "The key to press. Use special names for non-character keys, e.g. 'Enter', 'Tab', 'ArrowDown'." },
+					explanation: { type: "string", description: "one tiny sentence describing what you just did with the key press." },
+				},
+				required: ["key"]
+			}
+		},
+		{
+			type: "function",
 			name: "navigate",
 			description: "Navigate to a specific URL.",
 			parameters: {
