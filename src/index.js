@@ -17,7 +17,7 @@ export default {
 		}
 		return new Response('Not Found', { status: 404 });
 
-	},
+	},	
 
 };
 
@@ -209,6 +209,7 @@ async function handleAgentRequest(request, env) {
 				properties: {
 					x: { type: "string", description: "The column no of the element to click." },
 					y: { type: "string", description: "The row no of the element to click." },
+					click_count: { type: "string", description: "The number of times to click. Can be 1 for a single click, 2 for a double click, etc." },
 					explanation: { type: "string", description: "one tiny sentence describing what you just clicked." },
 				},
 				required: ["x", "y"]
@@ -231,7 +232,7 @@ async function handleAgentRequest(request, env) {
 		},
 		{
 			type: "function",
-			name: "key_press",
+			name: "keypress",
 			description: "Simulate a key press.",
 			parameters: {
 				type: "object",
@@ -249,7 +250,8 @@ async function handleAgentRequest(request, env) {
 			parameters: {
 				type: "object",
 				properties: {
-					url: { type: "string", description: "The URL to navigate to." },
+					url: { type: "string", description: "The URL to navigate to. Use an existing tab's url to navigate to it." },
+					new_tab: { type: "boolean", description: "Whether to open the URL in a new tab or not." },
 					explanation: { type: "string", description: "one tiny sentence describing why you are navigating there." },
 				},
 				required: ["url"]
@@ -278,7 +280,7 @@ async function handleAgentRequest(request, env) {
 			parameters: {
 				type: "object",
 				properties: {
-					seconds: { type: "string", description: "The number of seconds to wait." },
+					seconds: { type: "integer", description: "The number of seconds to wait." },
 				},
 				required: ["seconds"]
 			}
