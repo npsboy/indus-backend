@@ -42,11 +42,17 @@ async function handleChatRequest(request, env) {
 
 	let model;
 	if (agentRole === 'planner') {
-		model = 'openai/gpt-5.2';
+		model = 'openai/gpt-5.4';
 	} else if (agentRole === 'interpreter') {
 		model = 'openai/gpt-4.1-mini';
 	} else if (agentRole === 'reader') {
 		model = 'openai/gpt-5-mini';
+	} else if (agentRole === 'supervisor') {
+		model = 'openai/gpt-5.4';
+	} else if (agentRole === 'dispatcher') { 
+		model = 'openai/gpt-oss-120b:nitro';
+	} else if (agentRole === 'conversant') {
+		model = '~anthropic/claude-sonnet-latest:online';
 	} else {
 		return new Response('Invalid role specified.', { status: 400 });
 	}
@@ -177,7 +183,7 @@ async function handleAgentRequest(request, env) {
 		return new Response('messages must be an array.', { status: 400 });
 	}
 
-	const model = "openai/gpt-5.4";
+	const model = "openai/gpt-5.5";
 
 	const messagesPayload = messages.map(m => ({
 		role: m.role,
