@@ -69,6 +69,10 @@ async function handleChatRequest(request, env) {
 		});
 	}
 
+	if (agentRole === 'conversant') {
+		return handleConversantStreaming(messagesPayload, model, env);
+	}
+
 	const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
 		method: 'POST',
 		headers: {
@@ -80,7 +84,7 @@ async function handleChatRequest(request, env) {
 
 	if (!response.ok) {
 		const errorText = await response.text();
-		return new Response(JSON.stringify({ error: `OpenRouter error: ${errorText}` }), { 
+		return new Response(JSON.stringify({ error: `OpenRouter error: ${errorText}` }), {
 			status: response.status,
 			headers: { 'Content-Type': 'application/json' }
 		});
@@ -94,6 +98,63 @@ async function handleChatRequest(request, env) {
 	}
 
 	return new Response(JSON.stringify({ reply }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+async function handleConversantStreaming(messagesPayload, model, env) {
+	const upstream = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${env.OpenRouter_API_KEY}`,
+		},
+		body: JSON.stringify({ model, messages: messagesPayload, stream: true }),
+	});
+
+	if (!upstream.ok) {
+		const errorText = await upstream.text();
+		return new Response(JSON.stringify({ error: `OpenRouter error: ${errorText}` }), {
+			status: upstream.status,
+			headers: { 'Content-Type': 'application/json' },
+		});
+	}
+
+	const encoder = new TextEncoder();
+	const decoder = new TextDecoder();
+	let buffer = '';
+
+	const { readable, writable } = new TransformStream({
+		transform(chunk, controller) {
+			buffer += decoder.decode(chunk, { stream: true });
+			const lines = buffer.split('\n');
+			buffer = lines.pop() ?? '';
+
+			for (const line of lines) {
+				if (!line.startsWith('data: ')) continue;
+				const payload = line.slice(6).trim();
+				if (payload === '[DONE]') {
+					controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+					continue;
+				}
+				try {
+					const parsed = JSON.parse(payload);
+					const delta = parsed.choices?.[0]?.delta?.content;
+					if (delta != null) {
+						controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`));
+					}
+				} catch (_) {}
+			}
+		},
+	});
+
+	upstream.body.pipeTo(writable).catch(() => {});
+
+	return new Response(readable, {
+		status: 200,
+		headers: {
+			'Content-Type': 'text/event-stream',
+			'Cache-Control': 'no-cache',
+		},
+	});
 }
 
 async function handleComputerRequest(request, env) {
