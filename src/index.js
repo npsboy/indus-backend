@@ -25,13 +25,18 @@ async function handleChatRequest(request, env) {
 
 	{/* format of expected request body:
 	{
-		"agentRole": "planner" | "interpreter" | "reader",
+		"agentRole": "planner" | "interpreter" | "reader" | "supervisor" | "conversant",
 		"messages": [ { "role": "user" | "system", "content": "..." }, ... ],
 		"imageUrl": "..."  // optional
 	}
+	"dispatcher" is not an LLM and takes a different body, see handleDispatcherRequest.
 	*/}
 
-	const { agentRole, messages, imageUrl } = await request.json();
+	const { agentRole, messages, imageUrl, state, questions } = await request.json();
+
+	if (agentRole === 'dispatcher') {
+		return handleDispatcherRequest(state, questions, env);
+	}
 
 	if (!agentRole || !messages) {
 		return new Response('agentRole and messages are required.', { status: 400 });
@@ -42,15 +47,13 @@ async function handleChatRequest(request, env) {
 
 	let model;
 	if (agentRole === 'planner') {
-		model = 'openai/gpt-5.4';
+		model = '~openai/gpt-sol-latest';
 	} else if (agentRole === 'interpreter') {
-		model = 'openai/gpt-4.1-mini';
+		model = '~openai/gpt-mini-latest';
 	} else if (agentRole === 'reader') {
-		model = 'openai/gpt-5-mini';
+		model = '~openai/gpt-mini-latest';
 	} else if (agentRole === 'supervisor') {
-		model = 'openai/gpt-5.4';
-	} else if (agentRole === 'dispatcher') { 
-		model = 'openai/gpt-oss-120b:nitro';
+		model = '~openai/gpt-sol-latest';
 	} else if (agentRole === 'conversant') {
 		model = '~anthropic/claude-sonnet-latest:online';
 	} else {
@@ -98,6 +101,51 @@ async function handleChatRequest(request, env) {
 	}
 
 	return new Response(JSON.stringify({ reply }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+async function handleDispatcherRequest(state, questions, env) {
+
+	{/* format of expected request body:
+	{
+		"agentRole": "dispatcher",
+		"state": { ... },       // any JSON describing the current situation
+		"questions": {          // keyed by name, each one of: choice | noul | score
+			"team": { "type": "choice", "instructions": "...", "criteria": { "a": "when a", "b": "when b" } },
+			"is_bug": { "type": "noul", "instructions": "...", "criteria": { "true": "...", "false": "..." } },
+			"urgency": { "type": "score", "instructions": "...", "criteria": ["low", "mid", "high"] }
+		}
+	}
+	*/}
+
+	if (!state || typeof state !== 'object') {
+		return new Response('state must be an object for the dispatcher.', { status: 400 });
+	}
+	if (!questions || typeof questions !== 'object' || Object.keys(questions).length === 0) {
+		return new Response('questions must be a non-empty object for the dispatcher.', { status: 400 });
+	}
+
+	const response = await fetch('https://openrouter.ai/api/alpha/decisions', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${env.OpenRouter_API_KEY}`,
+		},
+		body: JSON.stringify({ model: '~typesafe/jev-latest', state, questions }),
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		return new Response(JSON.stringify({ error: `OpenRouter error: ${errorText}` }), {
+			status: response.status,
+			headers: { 'Content-Type': 'application/json' }
+		});
+	}
+
+	const data = await response.json();
+	return new Response(JSON.stringify({ answers: data.answers, model: data.model, usage: data.usage }), {
+		status: 200,
+		headers: { 'Content-Type': 'application/json' }
+	});
 }
 
 async function handleConversantStreaming(messagesPayload, model, env) {
@@ -235,7 +283,7 @@ async function handleAgentRequest(request, env) {
 	}
 	*/}
 
-	const { messages, imageUrl } = await request.json();
+	const { messages, imageUrl, tools: clientTools } = await request.json();
 
 	if (!messages) {
 		return new Response('messages are required.', { status: 400 });
@@ -244,7 +292,7 @@ async function handleAgentRequest(request, env) {
 		return new Response('messages must be an array.', { status: 400 });
 	}
 
-	const model = "openai/gpt-5.5";
+	const model = "~openai/gpt-luna-latest";
 
 	const messagesPayload = messages.map(m => ({
 		role: m.role,
@@ -258,7 +306,9 @@ async function handleAgentRequest(request, env) {
 		});
 	}
 
-	const tools = [
+	// Default tools target elements via grid coordinates. Clients can send their own
+	// `tools` (e.g. label-based targeting) to override them.
+	const defaultTools = [
 		{
 			type: "function",
 			function: {
@@ -384,6 +434,7 @@ async function handleAgentRequest(request, env) {
 			}
 		}
 	];
+	const tools = Array.isArray(clientTools) && clientTools.length > 0 ? clientTools : defaultTools;
 
 	const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
 		method: 'POST',
