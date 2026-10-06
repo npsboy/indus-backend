@@ -48,13 +48,13 @@ async function handleChatRequest(request, env) {
 
 	let model;
 	if (agentRole === 'planner') {
-		model = '~openai/gpt-sol-latest';
+		model = '~anthropic/claude-sonnet-latest';
 	} else if (agentRole === 'interpreter') {
 		model = '~openai/gpt-mini-latest';
 	} else if (agentRole === 'reader') {
 		model = '~openai/gpt-mini-latest';
 	} else if (agentRole === 'supervisor') {
-		model = '~openai/gpt-sol-latest';
+		model = '~anthropic/claude-sonnet-latest';
 	} else if (agentRole === 'conversant') {
 		model = '~anthropic/claude-sonnet-latest:online';
 	} else if (agentRole === 'titler') {
@@ -302,10 +302,7 @@ async function handleAgentRequest(request, env) {
 
 	const model = "~anthropic/claude-sonnet-latest";
 
-	const messagesPayload = messages.map(m => ({
-		role: m.role,
-		content: [{ type: "text", text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }]
-	}));
+	const messagesPayload = buildCachedMessages(messages);
 
 	if (imageUrl) {
 		messagesPayload.push({
@@ -500,6 +497,8 @@ async function handleAgentRequest(request, env) {
 	}
 
 	const data = await response.json();
+	const cachedTokens = data.usage?.prompt_tokens_details?.cached_tokens ?? 0;
+	console.log(`agent usage: prompt=${data.usage?.prompt_tokens ?? '?'} cached=${cachedTokens} completion=${data.usage?.completion_tokens ?? '?'}`);
 
 	let replyText = '';
 	let toolCall = null;
@@ -518,5 +517,28 @@ async function handleAgentRequest(request, env) {
 	return new Response(JSON.stringify({
 		reply: replyText,
 		tool: toolCall,
+		usage: data.usage ?? null,
 	}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
+/**
+ * Converts client messages to OpenRouter content-part messages, with prompt caching.
+ * A message sent with `cache: true` gets an Anthropic `cache_control` breakpoint, so
+ * everything up to and including it (tools + that prompt) is cached and reused across
+ * steps. Consecutive system messages are merged into one multi-part system message so
+ * a static, cached prompt can be followed by per-step system text without busting the cache.
+ */
+function buildCachedMessages(messages) {
+	const out = [];
+	for (const m of messages) {
+		const part = { type: "text", text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) };
+		if (m.cache) part.cache_control = { type: "ephemeral" };
+		const prev = out[out.length - 1];
+		if (m.role === 'system' && prev?.role === 'system') {
+			prev.content.push(part);
+		} else {
+			out.push({ role: m.role, content: [part] });
+		}
+	}
+	return out;
 }
