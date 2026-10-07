@@ -65,9 +65,9 @@ The client builds the whole OpenRouter request (messages, tools, `tool_choice`, 
 | `reader`      | `~openai/gpt-mini-latest`                | `/api/v1/chat/completions`     |
 | `conversant`  | `~anthropic/claude-sonnet-latest:online` | `/api/v1/chat/completions`     |
 | `titler`      | `openai/gpt-oss-120b`                    | `/api/v1/chat/completions`     |
-| `dispatcher`  | `~typesafe/jev-latest`                   | `/api/alpha/decisions`         |
+| `decider`     | `~typesafe/jev-latest`                   | `/api/alpha/decisions`         |
 
-Models prefixed with `~` are OpenRouter "latest" aliases. The `dispatcher` is Jev, a structured decision model (not an LLM): its payload is `{ "state": { ... }, "questions": { ... } }` and it returns typed answers.
+Models prefixed with `~` are OpenRouter "latest" aliases. The `decider` is Jev, a structured decision model (not an LLM): its payload is `{ "state": { ... }, "questions": { ... } }` and it returns typed answers.
 
 ## Limits
 

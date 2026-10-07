@@ -17,7 +17,7 @@ const ROLES = {
 	titler: { model: 'openai/gpt-oss-120b', endpoint: CHAT_COMPLETIONS },
 	agent: { model: 'openai/gpt-6-luna', endpoint: CHAT_COMPLETIONS },
 	// Jev, a structured decision model (not an LLM): takes state + typed questions, returns typed answers.
-	dispatcher: { model: '~typesafe/jev-latest', endpoint: DECISIONS },
+	decider: { model: '~typesafe/jev-latest', endpoint: DECISIONS },
 };
 
 export default {
@@ -39,7 +39,7 @@ async function handleLlmRequest(request, env) {
 
 	{/* format of expected request body:
 	{
-		"agentRole": "planner" | "supervisor" | "agent" | "conversant" | "titler" | "dispatcher" | ...,
+		"agentRole": "planner" | "supervisor" | "agent" | "conversant" | "titler" | "decider" | ...,
 		"payload": { ... }  // the OpenRouter request body, without `model`
 	}
 	*/}
