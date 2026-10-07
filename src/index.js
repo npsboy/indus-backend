@@ -48,13 +48,13 @@ async function handleChatRequest(request, env) {
 
 	let model;
 	if (agentRole === 'planner') {
-		model = '~anthropic/claude-sonnet-latest';
+		model = 'anthropic/claude-sonnet-5.5';
 	} else if (agentRole === 'interpreter') {
 		model = '~openai/gpt-mini-latest';
 	} else if (agentRole === 'reader') {
 		model = '~openai/gpt-mini-latest';
 	} else if (agentRole === 'supervisor') {
-		model = '~anthropic/claude-sonnet-latest';
+		model = 'anthropic/claude-sonnet-5.5';
 	} else if (agentRole === 'conversant') {
 		model = '~anthropic/claude-sonnet-latest:online';
 	} else if (agentRole === 'titler') {
@@ -300,7 +300,7 @@ async function handleAgentRequest(request, env) {
 		return new Response('messages must be an array.', { status: 400 });
 	}
 
-	const model = "~anthropic/claude-sonnet-latest";
+	const model = "openai/gpt-6-luna";
 
 	const messagesPayload = buildCachedMessages(messages);
 
@@ -461,7 +461,38 @@ async function handleAgentRequest(request, env) {
 				}
 			}
 		},
-		{ 
+		{
+			type: "function",
+			function: {
+				name: "get_tips",
+				description: "Ask for task-specific tips when you are stuck or looping on something (e.g. topic \"shopping\" when a cart quantity won't go down). The tips are then shown to you in every later step. Unknown topics return the list of available ones.",
+				parameters: {
+					type: "object",
+					properties: {
+						topic: { type: "string", description: "The tip topic id, e.g. \"shopping\"." },
+						explanation: { type: "string", description: "one tiny sentence describing why you need the tips." },
+					},
+					required: ["topic"]
+				}
+			}
+		},
+		{
+			type: "function",
+			function: {
+				name: "change_step_delay",
+				description: "Change the wait before each of your steps for the rest of the task. Raise it when the page needs time to react between your actions (e.g. an opponent's move in a board game, slow loading); lower it (0 for none) when no waiting is needed anymore. The screenshot is taken after this wait.",
+				parameters: {
+					type: "object",
+					properties: {
+						seconds: { type: "number", description: "Seconds to wait before each step, 0 to 120." },
+						reason: { type: "string", description: "Short reason for the new delay." },
+						explanation: { type: "string", description: "one tiny sentence describing why you are changing the delay." },
+					},
+					required: ["seconds"]
+				}
+			}
+		},
+		{
 			type: "function",
 			function: {
 				name: "final_answer",
